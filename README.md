@@ -10,14 +10,16 @@ DeepSeek Harness 的"等待小鲸鱼"：对话执行时在页面顶部居中弹�
 - **DeepSeek 小鲸鱼**：彩色海底场景、渐变鲸身、摆动尾鳍、珊瑚障碍、小鱼与气泡视差。
 - **操作**：单击画布或按空格起跳；输入法组字不拦截空格，`Shift+Space` 仍可正常输入空格。
 - **位置**：默认顶部居中；拖动底部提示条可移动，双击提示条回到居中。
-- **联机排行榜**：撞一次自动上榜，画布底部实时滚动显示 `#排名 名字 分数`；榜单纯粹由 Host 半侧提供（`/dsh-whale-break/scores`），同一 Harness 下的另一个浏览器标签、手机（经 dsh-app）或局域网设备读到的是同一份榜单，不需要额外部署服务。
+- **全网排行榜**：撞一次自动上榜，画布底部实时滚动显示 `#排名 名字 分数`；默认读写 `https://dsh.gson.cn/whale-break/scores`，所有玩家共享同一份榜单。
 - **成绩**：右上角 `HI` 最高分，本地 `localStorage` 保存；服务器不可达时自动降级为本地。
 - **总开关**：输入框左侧工具行的鲸鱼按钮，一键全局开关。
 
 ## 排行榜说明
 
-- 数据落在 `$DSH_HOME/plugin-data/dsh-whale-break/scores.json`，保留前 20 名；分数上限 9,999,999，名字最长 16 字符。
-- 接口：`GET /dsh-whale-break/scores`、`POST /dsh-whale-break/scores`（`{"name":"...","score":123}`）。
+- **全网榜**：`https://dsh.gson.cn/whale-break/scores`（服务实现与部署见 [server/README.md](server/README.md)）。
+- **回退链**：自定义地址（`localStorage['dsh-rex-board']`）→ 全网榜 → 本机 Host 同源榜 `/dsh-whale-break/scores`；前一个不可达自动尝试下一个，全不可达时安静降级，不影响游戏。
+- **本机同源榜**：由插件 Host 半侧提供（同一 Harness 下的另一个浏览器标签、手机经 dsh-app 共享），数据落在 `$DSH_HOME/plugin-data/dsh-whale-break/scores.json`。
+- 榜单保留前 20 名；分数上限 9,999,999，名字最长 16 字符，每 IP 每分钟最多 30 次提交。
 - 名字在浏览器本地生成一次（`小鲸鱼####`），存在 `localStorage['dsh-rex-name']`。
 
 ## 安装

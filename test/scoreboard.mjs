@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 
-import { createScoreRoute, mergeEntries, normalizeEntry } from '../index.js'
+import { createScoreRoute, mergeEntries, normalizeEntry } from '../scoreboard.js'
 
 const dir = await mkdtemp(join(tmpdir(), 'dsh-whale-break-'))
 const file = join(dir, 'scores.json')

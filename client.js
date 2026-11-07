@@ -47,8 +47,18 @@ window.__ModuleLoader__.load({
       } catch (_error) {}
     }
 
-    const BOARD_PATH = '/dsh-whale-break/scores'
+    const BOARD_OVERRIDE_KEY = 'dsh-rex-board'
+    const BOARD_PUBLIC = 'https://dsh.gson.cn/whale-break/scores'
+    const BOARD_FALLBACK = '/dsh-whale-break/scores'
     const NAME_KEY = 'dsh-rex-name'
+
+    function boardSources() {
+      let custom = ''
+      try {
+        custom = localStorage.getItem(BOARD_OVERRIDE_KEY) ?? ''
+      } catch (_error) {}
+      return [custom, BOARD_PUBLIC, BOARD_FALLBACK].filter(Boolean)
+    }
 
     function playerName() {
       try {
@@ -536,23 +546,35 @@ window.__ModuleLoader__.load({
               score: Math.floor(Number(entry.score)),
             }))
         }
+        let boardUrl
+        const boardCandidates = () => (boardUrl ? [boardUrl] : boardSources())
         const loadBoard = async () => {
-          try {
-            const response = await fetch(BOARD_PATH, { headers: { accept: 'application/json' } })
-            if (!response.ok) return
-            applyBoard((await response.json()).scores)
-          } catch (_error) {}
+          for (const url of boardCandidates()) {
+            try {
+              const response = await fetch(url, { headers: { accept: 'application/json' } })
+              if (!response.ok) throw new Error(String(response.status))
+              applyBoard((await response.json()).scores)
+              boardUrl = url
+              return
+            } catch (_error) {}
+          }
+          boardUrl = undefined
         }
         const submitScore = async (score) => {
-          try {
-            const response = await fetch(BOARD_PATH, {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ name: playerName(), score }),
-            })
-            if (!response.ok) return
-            applyBoard((await response.json()).scores)
-          } catch (_error) {}
+          for (const url of boardCandidates()) {
+            try {
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ name: playerName(), score }),
+              })
+              if (!response.ok) throw new Error(String(response.status))
+              applyBoard((await response.json()).scores)
+              boardUrl = url
+              return
+            } catch (_error) {}
+          }
+          boardUrl = undefined
         }
         const frame = (now) => {
           if (!active) return
