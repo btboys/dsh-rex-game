@@ -671,6 +671,16 @@ window.__ModuleLoader__.load({
           active = false
           cancelAnimationFrame(raf)
         }
+        // A hidden run is settled: upload what was played and start fresh next time.
+        const settle = () => {
+          if (world.phase === 'run' && world.score >= 1) {
+            void submitScore(Math.floor(world.score))
+            world.posted = true
+            world.phase = 'over'
+            world.vy = 0
+          }
+          stop()
+        }
         const onResize = () => {
           if (!active) return
           resize()
@@ -692,7 +702,7 @@ window.__ModuleLoader__.load({
             last = performance.now()
             raf = requestAnimationFrame(frame)
           },
-          hide: stop,
+          hide: settle,
           tap() {
             jump(world)
             if (!active) paint()

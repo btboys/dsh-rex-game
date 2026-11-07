@@ -1,6 +1,6 @@
 {
   "name": "dsh-whale-break",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "description": "A DeepSeek whale mini-game for DeepSeek Harness with a shared scoreboard: it pops up while a turn is running and hides when the turn finishes or waits for you.",
   "author": "夏悸",
