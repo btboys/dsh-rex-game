@@ -45,7 +45,7 @@ assert.deepEqual(json(await call('GET', '/scores')), { scores: [] })
 // Device registration hands out sequential user numbers from 1.
 const first = json(await call('POST', '/register', { device: 'device-aaaaaaaa-1' }))
 assert.equal(first.user.id, 1)
-assert.equal(first.user.name, '用户1')
+assert.equal(first.user.name, '小鲸鱼1')
 assert.equal(typeof first.token, 'string')
 
 const firstAgain = json(await call('POST', '/register', { device: 'device-aaaaaaaa-1' }))
@@ -69,7 +69,7 @@ assert.equal(submitted.status, 200)
 const scores = json(submitted).scores
 assert.equal(scores.length, 1)
 assert.equal(scores[0].uid, 1)
-assert.equal(scores[0].name, '用户1')
+assert.equal(scores[0].name, '小鲸鱼1')
 assert.equal(scores[0].score, 1)
 
 assert.equal((await call('POST', '/scores', { run: started.run, score: 1 })).status, 401, 'run tokens are single-use')

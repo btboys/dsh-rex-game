@@ -8,13 +8,13 @@
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| `POST` | `/whale-break/register` | body `{ "device": "<设备唯一编码>" }`，首次返回 `{ "user": { "id": 1, "name": "用户1" }, "token": "..." }`；同一设备重复注册返回同一编号 |
+| `POST` | `/whale-break/register` | body `{ "device": "<设备唯一编码>" }`，首次返回 `{ "user": { "id": 1, "name": "小鲸鱼1" }, "token": "..." }`；同一设备重复注册返回同一编号 |
 | `POST` | `/whale-break/start` | body `{ "token": "<身份 token>" }`，开一局，返回一次性 `{ "run": "<签名 token>" }`（15 分钟有效） |
-| `GET` | `/whale-break/scores` | `{ "scores": [{ "uid": 1, "name": "用户1", "score": 421, "at": 1794043929123 }] }` |
+| `GET` | `/whale-break/scores` | `{ "scores": [{ "uid": 1, "name": "小鲸鱼1", "score": 421, "at": 1794043929123 }] }` |
 | `POST` | `/whale-break/scores` | body `{ "run": "...", "score": 421 }`，返回完整榜单 |
 | `OPTIONS` | 任意 | CORS 预检（`access-control-allow-origin: *`） |
 
-用户编号由服务端从 **1** 开始按注册顺序发放，和浏览器本地生成的设备唯一编码（`dev-<32 hex>`，存 `localStorage['dsh-rex-device']`）绑定：同一设备永远同一编号，编号和昵称（`用户N`）由服务端写入榜单，客户端无法自选或冒充。
+用户编号由服务端从 **1** 开始按注册顺序发放，和浏览器本地生成的设备唯一编码（`dev-<32 hex>`，存 `localStorage['dsh-rex-device']`）绑定：同一设备永远同一编号，编号和昵称（`小鲸鱼N`）由服务端写入榜单，客户端无法自选或冒充。
 
 ## 防刷分
 
