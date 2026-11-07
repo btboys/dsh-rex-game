@@ -48,28 +48,48 @@ window.__ModuleLoader__.load({
     }
 
     const BOARD_OVERRIDE_KEY = 'dsh-rex-board'
-    const BOARD_PUBLIC = 'https://dsh.gson.cn/whale-break/scores'
-    const BOARD_FALLBACK = '/dsh-whale-break/scores'
-    const NAME_KEY = 'dsh-rex-name'
+    const BOARD_PUBLIC = 'https://dsh.gson.cn/whale-break'
+    const BOARD_FALLBACK = '/dsh-whale-break'
+    const DEVICE_KEY = 'dsh-rex-device'
+    const USER_KEY = 'dsh-rex-user'
+
+    const asBase = (value) => value.replace(/\/scores\/?$/u, '').replace(/\/+$/u, '')
 
     function boardSources() {
       let custom = ''
       try {
         custom = localStorage.getItem(BOARD_OVERRIDE_KEY) ?? ''
       } catch (_error) {}
-      return [custom, BOARD_PUBLIC, BOARD_FALLBACK].filter(Boolean)
+      return [asBase(custom), BOARD_PUBLIC, BOARD_FALLBACK].filter(Boolean)
     }
 
-    function playerName() {
+    /** Stable per-device code; the server maps it to a user number from 1. */
+    function deviceCode() {
       try {
-        const saved = localStorage.getItem(NAME_KEY)
+        const saved = localStorage.getItem(DEVICE_KEY)
         if (saved) return saved
-        const name = '小鲸鱼' + String(1000 + Math.floor(Math.random() * 9000))
-        localStorage.setItem(NAME_KEY, name)
-        return name
+        const bytes = new Uint8Array(16)
+        crypto.getRandomValues(bytes)
+        const code = 'dev-' + Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+        localStorage.setItem(DEVICE_KEY, code)
+        return code
       } catch (_error) {
-        return '小鲸鱼'
+        return 'dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36)
       }
+    }
+
+    function readIdentity() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(USER_KEY) ?? 'null')
+        if (saved && Number.isInteger(saved.id) && typeof saved.token === 'string') return saved
+      } catch (_error) {}
+      return undefined
+    }
+
+    function storeIdentity(identity) {
+      try {
+        localStorage.setItem(USER_KEY, JSON.stringify(identity))
+      } catch (_error) {}
     }
 
     const ENABLED_KEY = 'dsh-rex-enabled'
@@ -548,6 +568,7 @@ window.__ModuleLoader__.load({
         }
         let boardBase
         let runToken
+        let identity
         const ensureBase = async () => {
           if (boardBase) return boardBase
           for (const base of boardSources()) {
@@ -561,17 +582,53 @@ window.__ModuleLoader__.load({
           }
           return undefined
         }
+        const ensureIdentity = async (base) => {
+          const cached = identity ?? readIdentity()
+          if (cached !== undefined) {
+            identity = cached
+            return cached
+          }
+          const response = await fetch(base + '/register', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ device: deviceCode() }),
+          })
+          if (!response.ok) throw new Error(String(response.status))
+          const data = await response.json()
+          if (!data || typeof data.token !== 'string' || !data.user) throw new Error('bad identity')
+          identity = { id: data.user.id, name: data.user.name, token: data.token }
+          storeIdentity(identity)
+          return identity
+        }
+        const requestRun = async (base, token) => {
+          const response = await fetch(base + '/start', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ token }),
+          })
+          if (!response.ok) throw new Error(String(response.status))
+          const data = await response.json()
+          return typeof data.run === 'string' ? data.run : undefined
+        }
         const startRun = async () => {
           runToken = undefined
           const base = await ensureBase()
           if (base === undefined) return
           try {
-            const response = await fetch(base + '/start', { method: 'POST' })
-            if (!response.ok) throw new Error(String(response.status))
-            const data = await response.json()
-            if (typeof data.run === 'string') runToken = { base, token: data.run }
+            const who = await ensureIdentity(base)
+            let run = await requestRun(base, who.token)
+            if (run === undefined) throw new Error('missing run')
+            runToken = { base, token: run }
           } catch (_error) {
-            boardBase = undefined
+            // A stale identity token (server changed) is refreshed once.
+            identity = undefined
+            try {
+              const who = await ensureIdentity(base)
+              const run = await requestRun(base, who.token)
+              if (run !== undefined) runToken = { base, token: run }
+            } catch (_retry) {
+              boardBase = undefined
+            }
           }
         }
         const submitScore = async (score) => {
@@ -582,7 +639,7 @@ window.__ModuleLoader__.load({
             const response = await fetch(run.base + '/scores', {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ name: playerName(), score, run: run.token }),
+              body: JSON.stringify({ run: run.token, score }),
             })
             if (!response.ok) {
               if (response.status === 401 || response.status === 403) boardBase = undefined

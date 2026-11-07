@@ -8,18 +8,22 @@
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| `POST` | `/whale-break/start` | 开一局，返回一次性 `{ "run": "<签名 token>" }`（15 分钟有效） |
-| `GET` | `/whale-break/scores` | `{ "scores": [{ "name": "小鲸鱼1001", "score": 421, "at": 1794043929123 }] }` |
-| `POST` | `/whale-break/scores` | body `{ "run": "...", "name": "小鲸鱼1001", "score": 421 }`，返回完整榜单 |
+| `POST` | `/whale-break/register` | body `{ "device": "<设备唯一编码>" }`，首次返回 `{ "user": { "id": 1, "name": "用户1" }, "token": "..." }`；同一设备重复注册返回同一编号 |
+| `POST` | `/whale-break/start` | body `{ "token": "<身份 token>" }`，开一局，返回一次性 `{ "run": "<签名 token>" }`（15 分钟有效） |
+| `GET` | `/whale-break/scores` | `{ "scores": [{ "uid": 1, "name": "用户1", "score": 421, "at": 1794043929123 }] }` |
+| `POST` | `/whale-break/scores` | body `{ "run": "...", "score": 421 }`，返回完整榜单 |
 | `OPTIONS` | 任意 | CORS 预检（`access-control-allow-origin: *`） |
+
+用户编号由服务端从 **1** 开始按注册顺序发放，和浏览器本地生成的设备唯一编码（`dev-<32 hex>`，存 `localStorage['dsh-rex-device']`）绑定：同一设备永远同一编号，编号和昵称（`用户N`）由服务端写入榜单，客户端无法自选或冒充。
 
 ## 防刷分
 
 纯客户端游戏无法做到绝对防作弊，但"手工调接口随便写分"会被挡住：
 
+- 身份必须携带服务端签发的身份 token（绑定设备编码与用户编号），自带编号/昵称无效；
 - 分数必须携带服务端签发的一次性 run token（HMAC 签名 + 15 分钟时效 + 用后作废），直接 POST 分数返回 `401`；
 - 服务端用自己的时钟计算这一局真实时长，分数上限为 `时长 × 22 分/秒 + 60`（游戏实际最高约 19.2 分/秒），瞬间提交大分返回 `400`；
-- 每 IP 每分钟最多 20 次提交 / 40 次开局，名字最长 16 字符、分数 `0..9999999` 整数、榜单保留前 20 名。
+- 每 IP 每分钟最多 20 次提交 / 40 次开局 / 20 次注册，分数 `0..9999999` 整数、榜单保留前 20 名、每个用户只保留最高分一行。
 
 剩余风险：脚本自动化真的玩一局、或者开一局后干等 15 分钟再提交接近上限的分数，理论上仍可上榜——这是没有服务端回放的代价，属于极低概率的有意作弊；如需更强约束，可以加"每 IP 每日入榜次数"或服务端记录操作摘要。
 
@@ -105,10 +109,14 @@ docker restart dsh-whale-break
 
 ```bash
 curl -s https://dsh.gson.cn/whale-break/scores
-RUN=$(curl -s -X POST https://dsh.gson.cn/whale-break/start | sed -E 's/.*"run":"([^"]+)".*/\1/')
+REG=$(curl -s -X POST https://dsh.gson.cn/whale-break/register \
+  -H 'content-type: application/json' -d '{"device":"demo-device-0001"}')
+TOKEN=$(echo "$REG" | sed -E 's/.*"token":"([^"]+)".*/\1/')
+RUN=$(curl -s -X POST https://dsh.gson.cn/whale-break/start \
+  -H 'content-type: application/json' -d "{\"token\":\"$TOKEN\"}" | sed -E 's/.*"run":"([^"]+)".*/\1/')
 curl -s -X POST https://dsh.gson.cn/whale-break/scores \
   -H 'content-type: application/json' \
-  -d "{\"run\":\"$RUN\",\"name\":\"小鲸鱼1001\",\"score\":1}" 
+  -d "{\"run\":\"$RUN\",\"score\":1}" 
 ```
 
 部署完成后刷新游戏页面即可看到全网榜；接口不可达时插件自动回退到 Host 同源榜（`/dsh-whale-break/scores`）再回退到本地，不会影响游戏。
