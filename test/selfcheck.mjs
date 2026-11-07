@@ -55,7 +55,7 @@ cleared.phase = 'run'
 cleared.corals.push({ x: 90, h: 30 })
 for (let i = 0; i < 120; i += 1) {
   const coral = cleared.corals[0]
-  if (coral && coral.x - whaleBox(cleared).x < 72 && cleared.y === FLOOR_Y) jump(cleared)
+  if (coral && coral.x - whaleBox(cleared).x < 45 && cleared.y === FLOOR_Y) jump(cleared)
   stepWorld(cleared, 1 / 60)
   assert.notEqual(cleared.phase, 'over', `coral should be cleared (frame ${i}, coral ${coral?.x})`)
 }

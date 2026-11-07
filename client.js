@@ -27,9 +27,9 @@ window.__ModuleLoader__.load({
     const FLOOR_Y = GROUND - WHALE.h
     const GRAVITY = 2600
     const JUMP_VELOCITY = -540
-    const SPEED_START = 230
-    const SPEED_MAX = 430
-    const SPEED_ACCEL = 7
+    const SPEED_START = 200
+    const SPEED_MAX = 320
+    const SPEED_ACCEL = 3
     const PANEL_WIDTH = 640
 
     function readBest() {
@@ -98,7 +98,7 @@ window.__ModuleLoader__.load({
         best: readBest(),
         ground: 0,
         leg: 0,
-        spawnIn: 260 + Math.random() * 120,
+        spawnIn: SPEED_START * (1.5 + Math.random() * 0.6),
         corals: [],
         fish,
         bubbles,
@@ -188,8 +188,8 @@ window.__ModuleLoader__.load({
 
       world.spawnIn -= world.speed * dt
       if (world.spawnIn <= 0) {
-        world.corals.push({ x: W + 14, h: 26 + Math.random() * 16, tint: Math.floor(Math.random() * 4) })
-        world.spawnIn = 250 + Math.random() * 200
+        world.corals.push({ x: W + 14, h: 22 + Math.random() * 12, tint: Math.floor(Math.random() * 4) })
+        world.spawnIn = world.speed * (0.95 + Math.random() * 0.75)
       }
       for (const coral of world.corals) coral.x -= world.speed * dt
       world.corals = world.corals.filter((coral) => coral.x > -24)
