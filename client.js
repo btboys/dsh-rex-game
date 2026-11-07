@@ -546,35 +546,52 @@ window.__ModuleLoader__.load({
               score: Math.floor(Number(entry.score)),
             }))
         }
-        let boardUrl
-        const boardCandidates = () => (boardUrl ? [boardUrl] : boardSources())
-        const loadBoard = async () => {
-          for (const url of boardCandidates()) {
+        let boardBase
+        let runToken
+        const ensureBase = async () => {
+          if (boardBase) return boardBase
+          for (const base of boardSources()) {
             try {
-              const response = await fetch(url, { headers: { accept: 'application/json' } })
+              const response = await fetch(base + '/scores', { headers: { accept: 'application/json' } })
               if (!response.ok) throw new Error(String(response.status))
               applyBoard((await response.json()).scores)
-              boardUrl = url
-              return
+              boardBase = base
+              return base
             } catch (_error) {}
           }
-          boardUrl = undefined
+          return undefined
+        }
+        const startRun = async () => {
+          runToken = undefined
+          const base = await ensureBase()
+          if (base === undefined) return
+          try {
+            const response = await fetch(base + '/start', { method: 'POST' })
+            if (!response.ok) throw new Error(String(response.status))
+            const data = await response.json()
+            if (typeof data.run === 'string') runToken = { base, token: data.run }
+          } catch (_error) {
+            boardBase = undefined
+          }
         }
         const submitScore = async (score) => {
-          for (const url of boardCandidates()) {
-            try {
-              const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ name: playerName(), score }),
-              })
-              if (!response.ok) throw new Error(String(response.status))
-              applyBoard((await response.json()).scores)
-              boardUrl = url
+          const run = runToken
+          runToken = undefined
+          if (run === undefined) return
+          try {
+            const response = await fetch(run.base + '/scores', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ name: playerName(), score, run: run.token }),
+            })
+            if (!response.ok) {
+              if (response.status === 401 || response.status === 403) boardBase = undefined
               return
-            } catch (_error) {}
+            }
+            applyBoard((await response.json()).scores)
+          } catch (_error) {
+            boardBase = undefined
           }
-          boardUrl = undefined
         }
         const frame = (now) => {
           if (!active) return
@@ -588,7 +605,7 @@ window.__ModuleLoader__.load({
           world.boardTimer += dt
           if (world.boardTimer > 30) {
             world.boardTimer = 0
-            void loadBoard()
+            void ensureBase()
           }
           paint()
           raf = requestAnimationFrame(frame)
@@ -612,7 +629,7 @@ window.__ModuleLoader__.load({
             }
             resize()
             paint()
-            void loadBoard()
+            void startRun()
             if (active) return
             active = true
             last = performance.now()

@@ -19,7 +19,8 @@ DeepSeek Harness 的"等待小鲸鱼"：对话执行时在页面顶部居中弹�
 - **全网榜**：`https://dsh.gson.cn/whale-break/scores`（服务实现与部署见 [server/README.md](server/README.md)）。
 - **回退链**：自定义地址（`localStorage['dsh-rex-board']`）→ 全网榜 → 本机 Host 同源榜 `/dsh-whale-break/scores`；前一个不可达自动尝试下一个，全不可达时安静降级，不影响游戏。
 - **本机同源榜**：由插件 Host 半侧提供（同一 Harness 下的另一个浏览器标签、手机经 dsh-app 共享），数据落在 `$DSH_HOME/plugin-data/dsh-whale-break/scores.json`。
-- 榜单保留前 20 名；分数上限 9,999,999，名字最长 16 字符，每 IP 每分钟最多 30 次提交。
+- 榜单保留前 20 名；分数上限 9,999,999，名字最长 16 字符，每 IP 每分钟最多 20 次提交。
+- **防刷分**：提交分数必须带服务端签发的一次性 run token（15 分钟有效、用后作废），且分数上限由服务端按这一局真实时长限制（约 22 分/秒），直接调接口写分会被拒绝。
 - 名字在浏览器本地生成一次（`小鲸鱼####`），存在 `localStorage['dsh-rex-name']`。
 
 ## 安装

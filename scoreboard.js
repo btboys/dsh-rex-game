@@ -1,3 +1,4 @@
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -6,16 +7,30 @@ import { dirname, join } from 'node:path'
  * Score store shared by the plugin's Host route (same-origin fallback) and the
  * standalone `server/leaderboard.mjs` service that can be deployed publicly.
  *
- * Wire format is intentionally tiny:
- *   GET  <base>          -> { scores: [{ name, score, at }] }
- *   POST <base> {name, score} -> { scores: [...] } (400 on invalid input)
+ * Anti-cheat model: the browser cannot be trusted, so a score is accepted only
+ * with a server-issued, single-use run token, and only up to the maximum the
+ * game's own scoring rate allows for the run's real duration:
+ *
+ *   POST <base>/start                 -> { run }        issue a run token
+ *   GET  <base>/scores                -> { scores }     public board
+ *   POST <base>/scores {run,name,score} -> { scores }   accept a finished run
+ *
+ * A manual caller can still wait out a run and submit a maximal score, but it
+ * can no longer post arbitrary values instantly, replay a token, or backfill a
+ * forged history.
  */
 export const MAX_ENTRIES = 20
 export const MAX_SCORE = 9_999_999
 export const MAX_NAME = 16
 const MAX_BODY = 4096
 const RATE_WINDOW_MS = 60_000
-const RATE_MAX_POSTS = 30
+const RATE_MAX_POSTS = 20
+const RATE_MAX_STARTS = 40
+const RUN_TTL_MS = 15 * 60_000
+// The game awards `speed * 0.06` points per second and caps speed at 320 px/s,
+// so 19.2 points/s is the physical ceiling; keep a small margin for rounding.
+const MAX_SCORE_RATE = 22
+const SCORE_GRACE = 60
 
 export function defaultDataFile(home = process.env.DSH_HOME ?? join(homedir(), '.dsh')) {
   return join(home, 'plugin-data', 'dsh-whale-break', 'scores.json')
@@ -81,24 +96,100 @@ export async function addEntry(entry, file) {
   return next
 }
 
-const postHits = new Map()
+// ---------------------------------------------------------------- run tokens
 
-/** Cheap per-IP post throttle; the board is a toy, not a target. */
-function allowPost(key) {
+const secrets = new Map()
+
+async function secretFor(file) {
+  if (process.env.SCOREBOARD_SECRET) return process.env.SCOREBOARD_SECRET
+  const cached = secrets.get(file)
+  if (cached !== undefined) return cached
+  const path = join(dirname(file), 'secret')
+  let secret
+  try {
+    secret = (await readFile(path, 'utf8')).trim()
+  } catch (_error) {
+    secret = randomBytes(32).toString('hex')
+    await mkdir(dirname(path), { recursive: true })
+    await writeFile(path, secret, { mode: 0o600 })
+  }
+  secrets.set(file, secret)
+  return secret
+}
+
+function sign(secret, body) {
+  return createHmac('sha256', secret).update(body).digest('base64url')
+}
+
+/** Issue a single-use run token; the server remembers only its id until expiry. */
+export async function issueRun(file) {
+  const secret = await secretFor(file)
+  const body = Buffer.from(
+    JSON.stringify({ id: randomBytes(12).toString('base64url'), iat: Date.now() }),
+  ).toString('base64url')
+  return `${body}.${sign(secret, body)}`
+}
+
+const usedRuns = new Map()
+
+function pruneUsed(now = Date.now()) {
+  for (const [id, expiresAt] of usedRuns) if (expiresAt <= now) usedRuns.delete(id)
+}
+
+/**
+ * Verify a run token and consume it, returning the run's real duration.
+ * @returns `{ elapsedMs }`, or `undefined` for a forged, expired or reused run.
+ */
+export async function consumeRun(token, file) {
+  const secret = await secretFor(file)
+  if (typeof token !== 'string') return undefined
+  const [body, mac] = token.split('.')
+  if (body === undefined || mac === undefined) return undefined
+  const expected = sign(secret, body)
+  if (mac.length !== expected.length) return undefined
+  if (!timingSafeEqual(Buffer.from(mac), Buffer.from(expected))) return undefined
+  let payload
+  try {
+    payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'))
+  } catch (_error) {
+    return undefined
+  }
+  if (typeof payload?.id !== 'string' || typeof payload?.iat !== 'number') return undefined
   const now = Date.now()
-  const hits = (postHits.get(key) ?? []).filter((at) => now - at < RATE_WINDOW_MS)
-  if (hits.length >= RATE_MAX_POSTS) {
-    postHits.set(key, hits)
+  const elapsedMs = now - payload.iat
+  if (elapsedMs < 0 || elapsedMs > RUN_TTL_MS) return undefined
+  pruneUsed(now)
+  if (usedRuns.has(payload.id)) return undefined
+  usedRuns.set(payload.id, payload.iat + RUN_TTL_MS)
+  return { elapsedMs }
+}
+
+/** The largest score the game could have produced in `elapsedMs`. */
+export function maxScoreFor(elapsedMs) {
+  const elapsed = Math.max(0, elapsedMs) / 1000
+  return Math.min(MAX_SCORE, Math.floor(elapsed * MAX_SCORE_RATE) + SCORE_GRACE)
+}
+
+// ---------------------------------------------------------------- HTTP face
+
+const hits = new Map()
+
+/** Cheap per-IP throttle; the board is a toy, not a target. */
+function allowPost(key, limit = RATE_MAX_POSTS) {
+  const now = Date.now()
+  const recent = (hits.get(key) ?? []).filter((at) => now - at < RATE_WINDOW_MS)
+  if (recent.length >= limit) {
+    hits.set(key, recent)
     return false
   }
-  hits.push(now)
-  postHits.set(key, hits)
-  if (postHits.size > 5000) postHits.clear()
+  recent.push(now)
+  hits.set(key, recent)
+  if (hits.size > 5000) hits.clear()
   return true
 }
 
-function send(response, status, body, headers) {
-  response.writeHead(status, headers)
+function send(response, status, body) {
+  response.writeHead(status, CORS_HEADERS)
   response.end(JSON.stringify(body))
 }
 
@@ -146,28 +237,57 @@ export function createScoreRoute({ file = defaultDataFile(), path = '/dsh-whale-
         response.end()
         return
       }
-      if (request.method === 'GET') {
-        send(response, 200, { scores: await readEntries(file) }, CORS_HEADERS)
+      const pathname = new URL(request.url ?? '/', 'http://local').pathname
+      const ip = request.socket?.remoteAddress ?? 'unknown'
+      const isStart = pathname.endsWith('/start')
+      const isScores = pathname.endsWith('/scores')
+      if (!isStart && !isScores) {
+        send(response, 404, { error: 'not found' })
         return
       }
-      if (request.method === 'POST') {
-        const ip = request.socket?.remoteAddress ?? 'unknown'
+
+      if (isStart && request.method === 'POST') {
+        if (!allowPost(ip, RATE_MAX_STARTS)) {
+          send(response, 429, { error: 'too many runs' })
+          return
+        }
+        send(response, 200, { run: await issueRun(file) })
+        return
+      }
+
+      if (isScores && request.method === 'GET') {
+        send(response, 200, { scores: await readEntries(file) })
+        return
+      }
+
+      if (isScores && request.method === 'POST') {
         if (!allowPost(ip)) {
-          send(response, 429, { error: 'too many scores' }, CORS_HEADERS)
+          send(response, 429, { error: 'too many scores' })
           return
         }
-        const entry = normalizeEntry(await readJson(request))
+        const body = await readJson(request)
+        const entry = normalizeEntry(body)
         if (entry === undefined) {
-          send(response, 400, { error: 'invalid score' }, CORS_HEADERS)
+          send(response, 400, { error: 'invalid score' })
           return
         }
-        send(response, 200, { scores: await addEntry(entry, file) }, CORS_HEADERS)
+        const run = await consumeRun(body.run, file)
+        if (run === undefined) {
+          send(response, 401, { error: 'run token required' })
+          return
+        }
+        if (entry.score > maxScoreFor(run.elapsedMs)) {
+          send(response, 400, { error: 'score exceeds the run duration' })
+          return
+        }
+        send(response, 200, { scores: await addEntry(entry, file) })
         return
       }
+
       response.writeHead(405, { ...CORS_HEADERS, allow: 'GET,POST,OPTIONS' })
       response.end()
     } catch (_error) {
-      send(response, 500, { error: 'scoreboard failed' }, CORS_HEADERS)
+      send(response, 500, { error: 'scoreboard failed' })
     }
   }
   return { kind: 'prefix', path, handler }
