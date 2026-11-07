@@ -47,6 +47,21 @@ window.__ModuleLoader__.load({
       } catch (_error) {}
     }
 
+    const BOARD_PATH = '/dsh-whale-break/scores'
+    const NAME_KEY = 'dsh-rex-name'
+
+    function playerName() {
+      try {
+        const saved = localStorage.getItem(NAME_KEY)
+        if (saved) return saved
+        const name = '小鲸鱼' + String(1000 + Math.floor(Math.random() * 9000))
+        localStorage.setItem(NAME_KEY, name)
+        return name
+      } catch (_error) {
+        return '小鲸鱼'
+      }
+    }
+
     const ENABLED_KEY = 'dsh-rex-enabled'
     const enabledStore = {
       value: undefined,
@@ -103,6 +118,10 @@ window.__ModuleLoader__.load({
         fish,
         bubbles,
         bubbleIn: 0.2,
+        board: [],
+        posted: false,
+        boardTimer: 0,
+        ticker: 0,
       }
     }
 
@@ -121,6 +140,8 @@ window.__ModuleLoader__.load({
       world.fish = fresh.fish
       world.bubbles = fresh.bubbles
       world.bubbleIn = fresh.bubbleIn
+      world.posted = false
+      world.boardTimer = 0
     }
 
     function jump(world) {
@@ -159,6 +180,7 @@ window.__ModuleLoader__.load({
           fish.y = 16 + Math.random() * 52
         }
       }
+      world.ticker += dt * 24
       if (world.phase !== 'run') return
 
       world.speed = Math.min(SPEED_MAX, world.speed + SPEED_ACCEL * dt)
@@ -390,6 +412,24 @@ window.__ModuleLoader__.load({
         }
       }
 
+      const label = world.board.length
+        ? world.board
+            .slice(0, 8)
+            .map((entry, index) => '#' + (index + 1) + ' ' + (entry.name ? entry.name + ' ' : '') + pad(entry.score))
+            .join('   ·   ') + '   ·   '
+        : 'TOP   ·   NO SCORES YET   ·   '
+      ctx2d.save()
+      ctx2d.font = '600 10px "PingFang SC", ui-monospace, SFMono-Regular, Menlo, monospace'
+      const tickerWidth = ctx2d.measureText(label).width || 1
+      const offset = world.ticker % tickerWidth
+      ctx2d.fillStyle = 'rgba(6, 16, 40, 0.5)'
+      ctx2d.fillRect(0, GROUND + 4, W, 15)
+      ctx2d.fillStyle = '#e6eeff'
+      ctx2d.textAlign = 'left'
+      ctx2d.fillText(label, -offset, GROUND + 15)
+      ctx2d.fillText(label, tickerWidth - offset, GROUND + 15)
+      ctx2d.restore()
+
       ctx2d.save()
       ctx2d.shadowColor = 'rgba(3, 10, 28, 0.6)'
       ctx2d.shadowBlur = 4
@@ -486,11 +526,48 @@ window.__ModuleLoader__.load({
           scale = canvas.width / W
         }
         const paint = () => paintWorld(ctx2d, world, scale)
+        const applyBoard = (scores) => {
+          if (!Array.isArray(scores)) return
+          world.board = scores
+            .filter((entry) => entry !== null && typeof entry === 'object' && Number.isFinite(Number(entry.score)))
+            .slice(0, 10)
+            .map((entry) => ({
+              name: typeof entry.name === 'string' ? entry.name : '',
+              score: Math.floor(Number(entry.score)),
+            }))
+        }
+        const loadBoard = async () => {
+          try {
+            const response = await fetch(BOARD_PATH, { headers: { accept: 'application/json' } })
+            if (!response.ok) return
+            applyBoard((await response.json()).scores)
+          } catch (_error) {}
+        }
+        const submitScore = async (score) => {
+          try {
+            const response = await fetch(BOARD_PATH, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ name: playerName(), score }),
+            })
+            if (!response.ok) return
+            applyBoard((await response.json()).scores)
+          } catch (_error) {}
+        }
         const frame = (now) => {
           if (!active) return
           const dt = Math.min(0.05, Math.max(0, (now - last) / 1000))
           last = now
           stepWorld(world, dt)
+          if (world.phase === 'over' && !world.posted) {
+            world.posted = true
+            void submitScore(Math.floor(world.score))
+          }
+          world.boardTimer += dt
+          if (world.boardTimer > 30) {
+            world.boardTimer = 0
+            void loadBoard()
+          }
           paint()
           raf = requestAnimationFrame(frame)
         }
@@ -513,6 +590,7 @@ window.__ModuleLoader__.load({
             }
             resize()
             paint()
+            void loadBoard()
             if (active) return
             active = true
             last = performance.now()

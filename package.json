@@ -1,8 +1,8 @@
 {
   "name": "dsh-whale-break",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
-  "description": "A DeepSeek whale mini-game for DeepSeek Harness: it pops up while a turn is running and hides when the turn finishes or waits for you.",
+  "description": "A DeepSeek whale mini-game for DeepSeek Harness with a shared scoreboard: it pops up while a turn is running and hides when the turn finishes or waits for you.",
   "author": "夏悸",
   "license": "MIT",
   "homepage": "https://github.com/btboys/dsh-rex-game#readme",
@@ -43,7 +43,7 @@
     "dino"
   ],
   "scripts": {
-    "test": "node test/selfcheck.mjs",
+    "test": "node test/selfcheck.mjs && node test/scoreboard.mjs",
     "pack:check": "npm pack --dry-run"
   },
   "dsh": {

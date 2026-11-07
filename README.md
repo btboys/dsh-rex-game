@@ -10,8 +10,15 @@ DeepSeek Harness 的"等待小鲸鱼"：对话执行时在页面顶部居中弹�
 - **DeepSeek 小鲸鱼**：彩色海底场景、渐变鲸身、摆动尾鳍、珊瑚障碍、小鱼与气泡视差。
 - **操作**：单击画布或按空格起跳；输入法组字不拦截空格，`Shift+Space` 仍可正常输入空格。
 - **位置**：默认顶部居中；拖动底部提示条可移动，双击提示条回到居中。
-- **成绩**：右上角 `HI` 最高分，本地 `localStorage` 保存。
+- **联机排行榜**：撞一次自动上榜，画布底部实时滚动显示 `#排名 名字 分数`；榜单纯粹由 Host 半侧提供（`/dsh-whale-break/scores`），同一 Harness 下的另一个浏览器标签、手机（经 dsh-app）或局域网设备读到的是同一份榜单，不需要额外部署服务。
+- **成绩**：右上角 `HI` 最高分，本地 `localStorage` 保存；服务器不可达时自动降级为本地。
 - **总开关**：输入框左侧工具行的鲸鱼按钮，一键全局开关。
+
+## 排行榜说明
+
+- 数据落在 `$DSH_HOME/plugin-data/dsh-whale-break/scores.json`，保留前 20 名；分数上限 9,999,999，名字最长 16 字符。
+- 接口：`GET /dsh-whale-break/scores`、`POST /dsh-whale-break/scores`（`{"name":"...","score":123}`）。
+- 名字在浏览器本地生成一次（`小鲸鱼####`），存在 `localStorage['dsh-rex-name']`。
 
 ## 安装
 

@@ -67,14 +67,17 @@ assert.ok(coralBox({ x: 200, h: 40 }).y >= 0, 'coral box inside the playfield')
 
 // The drawing pass touches a real 2D context and draws the HUD / game-over text.
 const calls = []
+const drawn = []
 const context2d = new Proxy(
   {},
   {
     get(target, key) {
       if (key in target) return target[key]
-      return () => {
+      return (...args) => {
         calls.push(String(key))
         if (String(key) === 'createLinearGradient') return { addColorStop() {} }
+        if (String(key) === 'measureText') return { width: 240 }
+        if (String(key) === 'fillText') drawn.push(String(args[0]))
       }
     },
     set(target, key, value) {
@@ -83,16 +86,30 @@ const context2d = new Proxy(
     },
   },
 )
-const drawn = createWorld()
-drawn.phase = 'run'
-drawn.corals.push({ x: 100, h: 30, tint: 1 })
-paintWorld(context2d, drawn, 2)
-assert.equal(calls.filter((call) => call === 'fillText').length, 1, 'running scene draws the score line')
+const scene = createWorld()
+scene.phase = 'run'
+scene.corals.push({ x: 100, h: 30, tint: 1 })
+paintWorld(context2d, scene, 2)
+assert.equal(calls.filter((call) => call === 'fillText').length, 3, 'running scene draws the ticker twice and the HUD')
 assert.ok(calls.includes('ellipse'), 'running scene draws the whale')
 assert.ok(calls.includes('stroke'), 'running scene draws the coral / sea floor')
-drawn.phase = 'over'
+assert.ok(drawn.join('').includes('NO SCORES YET'), 'empty board shows the placeholder')
+
+scene.phase = 'over'
 calls.length = 0
-paintWorld(context2d, drawn, 2)
-assert.equal(calls.filter((call) => call === 'fillText').length, 2, 'game over draws score and GAME OVER')
+drawn.length = 0
+paintWorld(context2d, scene, 2)
+assert.equal(calls.filter((call) => call === 'fillText').length, 4, 'game over draws ticker, HUD and GAME OVER')
+
+const ranked = createWorld()
+ranked.phase = 'run'
+ranked.board = [
+  { name: '小鲸鱼1001', score: 321 },
+  { name: '', score: 100 },
+]
+drawn.length = 0
+paintWorld(context2d, ranked, 2)
+assert.ok(drawn.join('').includes('#1 小鲸鱼1001 00321'), 'ticker renders rank, name and score')
+assert.ok(drawn.join('').includes('#2 00100'), 'ticker renders unnamed entries')
 
 console.log('rex-game selfcheck ok')
