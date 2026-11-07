@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Whale break",
+    "description": "Pops a DeepSeek whale mini-game while a turn is running, and hides it when the turn finishes or waits for you."
+  }
+}

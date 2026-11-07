@@ -1,0 +1,43 @@
+{
+  "name": "dsh-whale-break",
+  "title": {
+    "en": "Whale break",
+    "zh": "等待小鲸鱼"
+  },
+  "description": {
+    "en": "A DeepSeek whale mini-game that pops up while a turn is running, and hides when the turn finishes or waits for you.",
+    "zh": "对话执行时在页面顶部居中弹出 DeepSeek 小鲸鱼跑酷游戏打发等待时间；回合结束或需要你处理时自动暂停隐藏。"
+  },
+  "author": "夏悸",
+  "homepage": "https://github.com/btboys/dsh-rex-game#readme",
+  "repository": {
+    "url": "https://github.com/btboys/dsh-rex-game"
+  },
+  "metadata": {
+    "category": "assistant",
+    "keywords": [
+      "dsh",
+      "dsh-plugin",
+      "deepseek-harness",
+      "cordis",
+      "game",
+      "mini-game",
+      "whale",
+      "dino"
+    ]
+  },
+  "versions": [
+    {
+      "version": "0.1.0",
+      "publishTimestamp": 1794043562,
+      "source": {
+        "type": "npm"
+      },
+      "engines": {
+        "dsh": ">=0.2.2-rc.1",
+        "node": ">=20"
+      }
+    }
+  ],
+  "icon": "https://dsh.gson.cn/icons/dsh-whale-break.svg"
+}
