@@ -174,6 +174,23 @@ export function maxScoreFor(elapsedMs) {
 
 const hits = new Map()
 
+/**
+ * Real client address: behind nginx/uuwaf the socket belongs to the proxy, so
+ * the left-most X-Forwarded-For hop is used when present. A client can forge
+ * that header to dodge its own throttle, which is an acceptable trade for a
+ * toy board; scores still need a valid run token.
+ */
+function clientIp(request) {
+  const forwarded = request.headers?.['x-forwarded-for']
+  if (typeof forwarded === 'string') {
+    const first = forwarded.split(',')[0]?.trim()
+    if (first) return first
+  }
+  const realIp = request.headers?.['x-real-ip']
+  if (typeof realIp === 'string' && realIp.trim()) return realIp.trim()
+  return request.socket?.remoteAddress ?? 'unknown'
+}
+
 /** Cheap per-IP throttle; the board is a toy, not a target. */
 function allowPost(key, limit = RATE_MAX_POSTS) {
   const now = Date.now()
@@ -238,7 +255,7 @@ export function createScoreRoute({ file = defaultDataFile(), path = '/dsh-whale-
         return
       }
       const pathname = new URL(request.url ?? '/', 'http://local').pathname
-      const ip = request.socket?.remoteAddress ?? 'unknown'
+      const ip = clientIp(request)
       const isStart = pathname.endsWith('/start')
       const isScores = pathname.endsWith('/scores')
       if (!isStart && !isScores) {
