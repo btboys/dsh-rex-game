@@ -1,6 +1,8 @@
 # 全网排行榜服务
 
-给 `https://dsh.gson.cn/whale-break/` 提供接口的最小服务（单文件、零依赖、Node 20+）。
+给 `https://dsh.gson.cn/whale-break/` 提供接口的最小服务（共享 `../scoreboard.js`，Node 18+）。
+
+**已部署**：`https://dsh.gson.cn/whale-break/`（2026-11-07，财务专用ECS / 47.99.77.94，Docker `node:18-alpine` + 宿主 nginx `location /whale-break/` 反代 `127.0.0.1:8787`）。
 
 ## 接口
 
@@ -60,6 +62,43 @@ location /whale-break/ {
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 }
+```
+
+## 本机部署形态（已生效）
+
+```bash
+# 代码与启动方式
+/opt/dsh-whale-break/            # package.json + scoreboard.js + server/leaderboard.mjs（只读挂载）
+/var/lib/dsh-whale-break/        # scores.json 与 HMAC secret（持久化）
+
+docker run -d --name dsh-whale-break --restart=always \
+  -v /opt/dsh-whale-break:/app:ro -v /var/lib/dsh-whale-break:/data \
+  -p 127.0.0.1:8787:8787 \
+  -e PORT=8787 -e HOST=0.0.0.0 -e DATA_FILE=/data/scores.json \
+  node:18-alpine node /app/server/leaderboard.mjs
+```
+
+nginx（`/usr/local/nginx/conf/vhost/dsh.gson.cn.conf`）：
+
+```nginx
+location /whale-break/ {
+  proxy_pass http://127.0.0.1:8787;
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_http_version 1.1;
+  proxy_read_timeout 10s;
+}
+```
+
+注意：`/opt/dsh-whale-break` 必须有 `package.json`（`"type": "module"`），否则 `scoreboard.js` 会被当成 CommonJS，容器启动报 `Named export 'createScoreRoute' not found`。
+
+更新版本：
+
+```bash
+# 本机上传新的 scoreboard.js / server/leaderboard.mjs 后
+docker restart dsh-whale-break
+# secret 不变，已发 token 依旧有效；删 /var/lib/dsh-whale-break/scores.json 可清空榜单
 ```
 
 ## 验证
