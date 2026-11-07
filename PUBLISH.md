@@ -1,6 +1,6 @@
 # 发布说明
 
-当前产物：`dsh-whale-break@0.1.0`，已 `npm pack` 成 `dsh-whale-break-0.1.0.tgz`（8 个文件，8.8 kB）。
+当前产物：`dsh-whale-break@0.1.0`，仓库 `https://github.com/btboys/dsh-rex-game`，已 `npm pack` 成 `dsh-whale-break-0.1.0.tgz`。
 
 ## 1. 发布到 npm
 
@@ -17,8 +17,8 @@ npm publish --access public
 
 把 `market-entry.json` 的内容追加到 `https://dsh.gson.cn/index.json` 的 `plugins` 数组，并补全：
 
-- `homepage` / `repository.url`：填实际仓库地址
-- `author`：填实际作者
+- 仓库地址已填：`https://github.com/btboys/dsh-rex-game`
+- `author` 当前写的是「夏悸」，按需修改
 - `icon`：把 `icon.svg` 传到 `https://dsh.gson.cn/icons/dsh-whale-break.svg`
 - `metadata.category`：当前写的是 `assistant`，如果索引里更想归类到别的分组（developer-tools 等）改这一处
 - `versions[0].publishTimestamp`：以 npm 实际发布时间为准（当前是占位的时间戳）
