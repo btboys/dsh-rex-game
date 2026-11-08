@@ -1,8 +1,8 @@
 # 全网排行榜服务
 
-给 `https://dsh.gson.cn/whale-break/` 提供接口的最小服务（共享 `../scoreboard.js`，Node 18+）。
+给 `https://board.example.com/whale-break/` 提供接口的最小服务（共享 `../scoreboard.js`，Node 18+）。
 
-**已部署**：`https://dsh.gson.cn/whale-break/`（2026-11-07，财务专用ECS / 47.99.77.94，Docker `node:18-alpine` + 宿主 nginx `location /whale-break/` 反代 `127.0.0.1:8787`）。
+**已部署**：`https://board.example.com/whale-break/`（2026-11-07，财务专用ECS / 47.99.77.94，Docker `node:18-alpine` + 宿主 nginx `location /whale-break/` 反代 `127.0.0.1:8787`）。
 
 ## 接口
 
@@ -58,7 +58,7 @@ User=www-data
 WantedBy=multi-user.target
 ```
 
-nginx 反代（dsh.gson.cn 站点）：
+nginx 反代（board.example.com 站点）：
 
 ```nginx
 location /whale-break/ {
@@ -82,7 +82,7 @@ docker run -d --name dsh-whale-break --restart=always \
   node:18-alpine node /app/server/leaderboard.mjs
 ```
 
-nginx（`/usr/local/nginx/conf/vhost/dsh.gson.cn.conf`）：
+nginx（`/usr/local/nginx/conf/vhost/board.example.com.conf`）：
 
 ```nginx
 location /whale-break/ {
@@ -108,13 +108,14 @@ docker restart dsh-whale-break
 ## 验证
 
 ```bash
-curl -s https://dsh.gson.cn/whale-break/scores
-REG=$(curl -s -X POST https://dsh.gson.cn/whale-break/register \
+BASE=https://board.example.com/whale-break
+curl -s "$BASE/scores"
+REG=$(curl -s -X POST "$BASE/register" \
   -H 'content-type: application/json' -d '{"device":"demo-device-0001"}')
 TOKEN=$(echo "$REG" | sed -E 's/.*"token":"([^"]+)".*/\1/')
-RUN=$(curl -s -X POST https://dsh.gson.cn/whale-break/start \
+RUN=$(curl -s -X POST "$BASE/start" \
   -H 'content-type: application/json' -d "{\"token\":\"$TOKEN\"}" | sed -E 's/.*"run":"([^"]+)".*/\1/')
-curl -s -X POST https://dsh.gson.cn/whale-break/scores \
+curl -s -X POST "$BASE/scores" \
   -H 'content-type: application/json' \
   -d "{\"run\":\"$RUN\",\"score\":1}" 
 ```
