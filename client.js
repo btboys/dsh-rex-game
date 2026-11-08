@@ -567,7 +567,7 @@ window.__ModuleLoader__.load({
             }))
         }
         let boardBase
-        let runToken
+        let runStart
         let identity
         const ensureBase = async () => {
           if (boardBase) return boardBase
@@ -611,29 +611,29 @@ window.__ModuleLoader__.load({
           return typeof data.run === 'string' ? data.run : undefined
         }
         const startRun = async () => {
-          runToken = undefined
           const base = await ensureBase()
           if (base === undefined) return
           try {
             const who = await ensureIdentity(base)
             let run = await requestRun(base, who.token)
             if (run === undefined) throw new Error('missing run')
-            runToken = { base, token: run }
+            return { base, token: run }
           } catch (_error) {
             // A stale identity token (server changed) is refreshed once.
             identity = undefined
             try {
               const who = await ensureIdentity(base)
               const run = await requestRun(base, who.token)
-              if (run !== undefined) runToken = { base, token: run }
+              if (run !== undefined) return { base, token: run }
             } catch (_retry) {
               boardBase = undefined
             }
           }
         }
         const submitScore = async (score) => {
-          const run = runToken
-          runToken = undefined
+          const pending = runStart
+          runStart = undefined
+          const run = await pending
           if (run === undefined) return
           try {
             const response = await fetch(run.base + '/scores', {
@@ -696,7 +696,7 @@ window.__ModuleLoader__.load({
             }
             resize()
             paint()
-            void startRun()
+            runStart = startRun()
             if (active) return
             active = true
             last = performance.now()

@@ -45,7 +45,7 @@
     "dino"
   ],
   "scripts": {
-    "test": "node test/selfcheck.mjs && node test/scoreboard.mjs",
+    "test": "node test/selfcheck.mjs && node test/scoreboard.mjs && node test/hide-score.mjs",
     "pack:check": "npm pack --dry-run"
   },
   "dsh": {
