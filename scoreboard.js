@@ -26,6 +26,8 @@ export const MAX_ENTRIES = 20
 export const MAX_SCORE = 9_999_999
 export const MAX_NAME = 16
 const MAX_BODY = 4096
+// Request logging is opt-in: the public service keeps no per-request access log.
+const DEBUG_REQUESTS = process.env.SCOREBOARD_DEBUG === '1'
 const RATE_WINDOW_MS = 60_000
 const RATE_MAX_POSTS = 20
 const RATE_MAX_STARTS = 40
@@ -360,7 +362,9 @@ export function createScoreRoute({ file = defaultDataFile(), path = '/dsh-whale-
       }
       const pathname = new URL(request.url ?? '/', 'http://local').pathname
       const ip = clientIp(request)
-      if (request.method !== 'OPTIONS') console.log(`${request.method} ${pathname} ${ip}`)
+      if (DEBUG_REQUESTS && request.method !== 'OPTIONS') {
+        console.log(`${request.method} ${pathname.slice(0, 120)} ${ip}`)
+      }
       const isRegister = pathname.endsWith('/register')
       const isStart = pathname.endsWith('/start')
       const isScores = pathname.endsWith('/scores')
