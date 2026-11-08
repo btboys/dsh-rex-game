@@ -360,6 +360,7 @@ export function createScoreRoute({ file = defaultDataFile(), path = '/dsh-whale-
       }
       const pathname = new URL(request.url ?? '/', 'http://local').pathname
       const ip = clientIp(request)
+      if (request.method !== 'OPTIONS') console.log(`${request.method} ${pathname} ${ip}`)
       const isRegister = pathname.endsWith('/register')
       const isStart = pathname.endsWith('/start')
       const isScores = pathname.endsWith('/scores')
